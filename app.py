@@ -11,9 +11,12 @@ from bson.objectid import ObjectId
 
 load_dotenv()
 
+mongoClient = pymongo.MongoClient(os.getenv("DB_CONNECTION_STRING"))
+db = mongoClient[os.getenv("DB_NAME")]
+
 
 def extract_name(name):
-    units = ['Tỉnh', 'Thành phố', 'Quận', 'Huyện', 'Phường', 'Xã']
+    units = ['Tỉnh', 'Thành phố', 'Thị xã', 'Quận', 'Huyện', 'Phường', 'Xã']
     try:
         for u in units:
             if u in name:
@@ -30,11 +33,22 @@ def extract_name(name):
     }
 
 
-mongoClient = pymongo.MongoClient(os.getenv("DB_CONNECTION_STRING"))
-db = mongoClient[os.getenv("DB_NAME")]
+def write_data_to_db(data, collectionName, overwrite=True):
+    col = db[collectionName]
+    if overwrite:
+        col.drop()
+    col.insert_many(data)
+    print(f"Write data to collection: %s, length: %d" %
+          (collectionName, len(data)))
+    batch_size = 1000
+    # for index in range(0, len(data), batch_size):
+    #     page = data[index:index+batch_size]
+    #     db.data.insert_many(page)
 
-print('Drop all data in collection')
-db.data.delete_many({})
+    #     print(f'Write %d item from index: %d took : %d' %
+    #         (len(page), index))
+
+
 file = r'input.xls'
 df = pd.read_excel(file, encoding=sys.getfilesystemencoding())
 # for r in df:
@@ -88,14 +102,5 @@ for index, row in df.iterrows():
         'parent_id': dict[item['province']+item['district']]
     })
 
-db.items.drop()
-db.items.insert_many(items)
-batch_size = 1000
-for index in range(0, len(data), batch_size):
-    page = data[index:index+batch_size]
-    start = time.process_time()
-    db.data.insert_many(page)
-    elapsed_time = time.process_time() - start
-
-    print(f'Write %d item from index: %d took : %d' %
-          (len(page), index, elapsed_time))
+write_data_to_db(items, "items")
+write_data_to_db(data, "data")
